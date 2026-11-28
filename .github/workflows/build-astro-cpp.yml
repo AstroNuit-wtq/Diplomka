@@ -1,4 +1,4 @@
-name: Build Diplomka Native C++ APK · 2.7.4
+name: Build Diplomka Native C++ APK · 2.7.5
 
 on:
   workflow_dispatch:
@@ -6,6 +6,7 @@ on:
     paths:
       - 'Diplomka_Native_CPP_Source.zip'
       - '.github/workflows/build-astro-cpp.yml'
+      - 'kit_parts/**'
 
 # Build-only workflow: keep the repository and source archive unchanged.
 permissions:
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    name: Android arm64-v8a release APK · 2.7.4
+    name: Android arm64-v8a release APK · 2.7.5
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -58,7 +59,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      # Source archive and all generated build files stay outside the checkout.
+      - name: Reconstruct source ZIP from kit_parts if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$GITHUB_WORKSPACE/Diplomka_Native_CPP_Source.zip"
+          if [ -d "$GITHUB_WORKSPACE/kit_parts" ] && ls "$GITHUB_WORKSPACE/kit_parts"/p_*.b64 >/dev/null 2>&1; then
+            echo "Reconstructing Diplomka_Native_CPP_Source.zip from kit_parts..."
+            bash "$GITHUB_WORKSPACE/kit_parts/RECONSTRUCT.sh" "$ARCHIVE"
+            ls -lh "$ARCHIVE"
+          fi
+          test -f "$ARCHIVE" || { echo 'Missing Diplomka_Native_CPP_Source.zip and no kit_parts to reconstruct'; exit 1; }
+
       - name: Extract native source archive
         id: source
         shell: bash
@@ -119,7 +131,12 @@ jobs:
           grep -q 'drawStartupSplash' "$SRC_DIR/app/src/main/cpp/main.cpp"
           grep -q 'bool showLog = false;' "$SRC_DIR/app/src/main/cpp/main.cpp"
           grep -Fq 'const float buttonWidth = std::max(42.0f * scale, (width - gap) / 2.0f)' "$SRC_DIR/app/src/main/cpp/main.cpp"
-          grep -q 'Application session started; version 2.7.4' "$SRC_DIR/app/src/main/cpp/main.cpp"
+          grep -q 'Application session started; version 2.7.5' "$SRC_DIR/app/src/main/cpp/main.cpp"
+          test -f "$SRC_DIR/app/src/main/cpp/motor_engine.cpp"
+          test -f "$SRC_DIR/app/src/main/cpp/motor_engine.h"
+          grep -q 'applyStopFlag' "$SRC_DIR/app/src/main/cpp/main.cpp"
+          grep -q 'ImGui::NewLine()' "$SRC_DIR/app/src/main/cpp/main.cpp"
+          grep -q 'MotorEngine' "$SRC_DIR/app/src/main/cpp/CMakeLists.txt"
 
       - name: Run portable C++ unit tests
         shell: bash
@@ -198,15 +215,14 @@ jobs:
           mkdir -p "$RUNNER_TEMP/diplomka-output"
           APK="$SRC_DIR/app/build/outputs/apk/release/app-release.apk"
           test -f "$APK" || { find "$SRC_DIR/app/build/outputs" -maxdepth 6 -type f -print; exit 1; }
-          cp "$APK" "$RUNNER_TEMP/diplomka-output/Diplomka-Android-2.7.4-arm64-v8a.apk"
-          sha256sum "$RUNNER_TEMP/diplomka-output/Diplomka-Android-2.7.4-arm64-v8a.apk"
+          cp "$APK" "$RUNNER_TEMP/diplomka-output/Diplomka-Android-2.7.5-arm64-v8a.apk"
+          sha256sum "$RUNNER_TEMP/diplomka-output/Diplomka-Android-2.7.5-arm64-v8a.apk"
           ls -lh "$RUNNER_TEMP/diplomka-output"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Diplomka-Android-APK-2.7.4
-          path: ${{ runner.temp }}/diplomka-output/Diplomka-Android-2.7.4-arm64-v8a.apk
+          name: Diplomka-Android-APK-2.7.5
+          path: ${{ runner.temp }}/diplomka-output/Diplomka-Android-2.7.5-arm64-v8a.apk
           if-no-files-found: error
           retention-days: 14
-
